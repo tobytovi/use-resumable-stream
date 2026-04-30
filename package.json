@@ -1,6 +1,6 @@
 {
   "name": "use-resumable-stream",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "useChat, but resumable. Survives tab switch, refresh, and network drops.",
   "keywords": [
     "sse",
