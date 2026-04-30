@@ -1,0 +1,31 @@
+# 开发工具和配置（不发布到 npm）
+node_modules/
+.changeset/
+.github/
+examples/
+src/
+
+# 构建产物的 sourcemap（可选，减小包体积）
+# dist/**/*.map
+
+# 测试文件
+**/*.test.ts
+**/*.test.tsx
+**/*.spec.ts
+**/*.spec.tsx
+
+# 配置文件
+tsconfig.json
+tsup.config.ts
+.eslintrc*
+.prettierrc*
+
+# 编辑器
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# 系统文件
+.DS_Store
+Thumbs.db
