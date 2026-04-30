@@ -16,7 +16,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/your-org/use-resumable-stream"
+    "url": "https://github.com/tobytovi/use-resumable-stream"
   },
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
