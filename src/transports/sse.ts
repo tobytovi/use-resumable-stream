@@ -35,15 +35,19 @@ function* parseSseChunk(chunk: string): Generator<string> {
  * 创建 SSE Transport。
  *
  * @example
+ * // 1) 字符串 URL
  * const transport = createSseTransport({
- *   url: '/api/chat/stream',
- *   parseMessage: (raw) => {
- *     const msg = raw as { event_type: string; data: unknown };
- *     if (msg.event_type === 'DELTA') {
- *       return { type: 'DELTA', delta: msg.data, seq: 0 };
- *     }
- *     return null;
- *   },
+ *   url: 'https://api.example.com/chat/stream',
+ *   parseMessage: (raw) => { ... },
+ * });
+ *
+ * @example
+ * // 2) 函数式 URL（适合需要客户端动态拼 host 的场景，例如
+ * //    `https://${getServerHost()}/chat/stream`，避免在模块加载阶段
+ * //    访问 `window` / `location` 报错）
+ * const transport = createSseTransport({
+ *   url: () => `https://${getServerHost()}/chat/stream`,
+ *   parseMessage: (raw) => { ... },
  * });
  */
 export function createSseTransport<TBody = unknown>(
@@ -65,14 +69,24 @@ export function createSseTransport<TBody = unknown>(
       const { signal, onEvent, onError, onDone } = connectOptions;
       const resumeFromSeq = body.resumeFromSeq ?? 0;
 
-      // 构造请求体
-      const requestBody = buildBody
-        ? buildBody(body, resumeFromSeq)
-        : { ...body, resume_from_seq: resumeFromSeq };
+      // 构造请求体：默认剥离内部字段 resumeFromSeq，按蛇形命名追加 resume_from_seq；
+      // 调用方可通过 buildBody 完全自定义（例如使用其它字段名或外层包装结构）。
+      let requestBody: unknown;
+      if (buildBody) {
+        requestBody = buildBody(body, resumeFromSeq);
+      } else {
+        const sanitized: Record<string, unknown> = { ...(body as Record<string, unknown>) };
+        delete sanitized.resumeFromSeq;
+        sanitized.resume_from_seq = resumeFromSeq;
+        requestBody = sanitized;
+      }
+
+      // 解析 url（支持函数式延迟求值）
+      const resolvedUrl = typeof url === 'function' ? url() : url;
 
       let response: Response;
       try {
-        response = await fetch(url, {
+        response = await fetch(resolvedUrl, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',

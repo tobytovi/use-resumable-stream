@@ -225,8 +225,17 @@ export interface ResumableStreamResult<TData, TStartBody = unknown> {
 
 /** SSE Transport 配置 */
 export interface SseTransportOptions<TBody = unknown> {
-  /** SSE 端点 URL */
-  url: string;
+  /**
+   * SSE 端点 URL。
+   *
+   * 支持两种形式：
+   * - `string`：直接使用（可以是绝对地址或同 origin 相对地址）
+   * - `() => string`：函数式（每次连接前求值，适合需要根据 `window.location` 等
+   *   客户端运行时信息动态拼接 host 的场景）
+   *
+   * 推荐传完整 URL（含 `https://host`），避免相对路径意外落到当前页面 origin。
+   */
+  url: string | (() => string);
   /**
    * 将原始 SSE 消息解析为 StreamEvent。
    * 如果返回 null，则忽略该消息。
@@ -234,7 +243,9 @@ export interface SseTransportOptions<TBody = unknown> {
   parseMessage: (raw: unknown) => StreamEvent | null;
   /**
    * 构造请求体（合并业务参数和 resumeFromSeq）。
-   * 默认：直接透传 body，并追加 resume_from_seq 字段。
+   *
+   * 默认：从 body 中剥离内部字段 `resumeFromSeq`，按蛇形命名追加 `resume_from_seq`。
+   * 如果后端期望其它字段名（例如 `from_seq`），请自行实现。
    */
   buildBody?: (body: TBody, resumeFromSeq: number) => unknown;
   /**
