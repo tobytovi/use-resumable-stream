@@ -34,9 +34,37 @@ export function createStreamStore<T>() {
     globalListeners.forEach(fn => fn());
   }
 
-  /** 解析别名：如果 key 有别名，返回真实 key */
+  /**
+   * 解析别名（支持链式）：如果 key 有别名，递归追溯到最终 key。
+   *
+   * 链式语义示例：A → B → C，则 resolveKey(A) === resolveKey(B) === C。
+   * 防御无限环：使用 Set 记录已访问 key。
+   */
   function resolveKey(key: TaskKey): TaskKey {
-    return aliasMap.get(key) ?? key;
+    let current = key;
+    const visited = new Set<TaskKey>();
+    while (aliasMap.has(current) && !visited.has(current)) {
+      visited.add(current);
+      current = aliasMap.get(current)!;
+    }
+    return current;
+  }
+
+  /** 收集所有最终解析到 finalKey 的源别名（含 finalKey 自身），用于通知链上每一环 */
+  function collectAliasChain(finalKey: TaskKey): Set<TaskKey> {
+    const chain = new Set<TaskKey>([finalKey]);
+    // 反向遍历 aliasMap：如果某个 src 解析后等于 finalKey，则纳入
+    let changed = true;
+    while (changed) {
+      changed = false;
+      aliasMap.forEach((dest, src) => {
+        if (chain.has(dest) && !chain.has(src)) {
+          chain.add(src);
+          changed = true;
+        }
+      });
+    }
+    return chain;
   }
 
   /** 读取状态（自动解析别名） */
@@ -45,17 +73,13 @@ export function createStreamStore<T>() {
     return stateMap.get(resolved);
   }
 
-  /** 写入状态并通知订阅者 */
+  /** 写入状态并通知所有沿别名链解析到此 key 的订阅者 */
   function setState(key: TaskKey, state: StreamState<T>) {
     const resolved = resolveKey(key);
     stateMap.set(resolved, state);
-    notify(resolved);
-    // 如果有别名指向此 key，也通知别名的订阅者
-    aliasMap.forEach((realKey, pendingKey) => {
-      if (realKey === resolved) {
-        notify(pendingKey);
-      }
-    });
+    // 通知整条别名链上的所有订阅者（含 resolved 自身和所有最终指向它的别名 key）
+    const chain = collectAliasChain(resolved);
+    chain.forEach(notify);
   }
 
   /**
