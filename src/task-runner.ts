@@ -279,7 +279,7 @@ export function createTaskRunner<TData, TStartBody = unknown, TResumeBody = unkn
     let currentData = current.data;
 
     await transport.connect(
-      { resumeFromSeq: fromSeq } as unknown & { resumeFromSeq?: number },
+      { taskKey, resumeFromSeq: fromSeq } as unknown & { taskKey?: string; resumeFromSeq?: number },
       {
         signal: ctx.abortController.signal,
         onEvent: (event: StreamEvent) => {

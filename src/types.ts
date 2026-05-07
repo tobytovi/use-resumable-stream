@@ -247,7 +247,7 @@ export interface SseTransportOptions<TBody = unknown> {
    * 默认：从 body 中剥离内部字段 `resumeFromSeq`，按蛇形命名追加 `resume_from_seq`。
    * 如果后端期望其它字段名（例如 `from_seq`），请自行实现。
    */
-  buildBody?: (body: TBody, resumeFromSeq: number) => unknown;
+  buildBody?: (body: TBody & { taskKey?: string }, resumeFromSeq: number) => unknown;
   /**
    * 额外的请求头。
    */

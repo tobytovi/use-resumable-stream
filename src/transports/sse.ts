@@ -67,16 +67,17 @@ export function createSseTransport<TBody = unknown>(
       connectOptions: TransportConnectOptions,
     ): Promise<void> {
       const { signal, onEvent, onError, onDone } = connectOptions;
-      const resumeFromSeq = body.resumeFromSeq ?? 0;
+      const resumeFromSeq = (body as Record<string, unknown>).resumeFromSeq as number ?? 0;
 
-      // 构造请求体：默认剥离内部字段 resumeFromSeq，按蛇形命名追加 resume_from_seq；
+      // 构造请求体：默认剥离内部字段 resumeFromSeq / taskKey，按蛇形命名追加 resume_from_seq；
       // 调用方可通过 buildBody 完全自定义（例如使用其它字段名或外层包装结构）。
       let requestBody: unknown;
       if (buildBody) {
-        requestBody = buildBody(body, resumeFromSeq);
+        requestBody = buildBody(body as TBody & { taskKey?: string }, resumeFromSeq);
       } else {
         const sanitized: Record<string, unknown> = { ...(body as Record<string, unknown>) };
         delete sanitized.resumeFromSeq;
+        delete sanitized.taskKey;
         sanitized.resume_from_seq = resumeFromSeq;
         requestBody = sanitized;
       }
