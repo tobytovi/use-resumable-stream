@@ -12,6 +12,7 @@
  */
 import { useEffect, useRef } from 'react';
 import type { Transport, ResumableStreamOptions, TaskKey } from '../types';
+import type { StreamStore } from '../stream-store';
 import { createTaskRunner } from '../task-runner';
 import { useStreamStore } from './StreamProvider';
 import { isRealKey } from '../task-key';
@@ -23,6 +24,16 @@ export interface AutoResumeListProps<TData, TResumeBody = unknown> {
    * 只有 isRealKey(key) === true 的 key 才会发起续订。
    */
   taskKeys: string[];
+
+  /**
+   * 显式注入 store 实例（可选）。
+   * 当使用者通过 createStreamStore() 手动管理 store 时，
+   * 传入此 prop 可确保 AutoResumeList 与业务 runner 共享同一个 store，
+   * 避免"双 store 割裂"问题。
+   * 不传则从 <StreamProvider> context 中读取。
+   */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  store?: StreamStore<any>;
 
   /**
    * 续订用的 Transport。
@@ -75,6 +86,7 @@ export interface AutoResumeListProps<TData, TResumeBody = unknown> {
  */
 export function AutoResumeList<TData, TResumeBody = unknown>({
   taskKeys,
+  store: externalStore,
   resumeTransport,
   initialData,
   onEvent,
@@ -82,7 +94,8 @@ export function AutoResumeList<TData, TResumeBody = unknown>({
   onFailed,
   retryDelays,
 }: AutoResumeListProps<TData, TResumeBody>) {
-  const store = useStreamStore<TData>();
+  const contextStore = useStreamStore<TData>();
+  const store = (externalStore as StreamStore<TData> | undefined) ?? contextStore;
 
   // 用 ref 保存 runner，避免 taskKeys 变化时重建
   const runnerRef = useRef<ReturnType<typeof createTaskRunner<TData, unknown, TResumeBody>> | null>(null);

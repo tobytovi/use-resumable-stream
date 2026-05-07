@@ -204,6 +204,42 @@ function WorkCard({ workId }: { workId: string }) {
 
 Application-level provider. Must wrap your entire app.
 
+> **⭐ Recommended pattern:** Always create the store explicitly and pass it to both `<StreamProvider>` and `createTaskRunner` to ensure they share the **same** store instance.
+
+```tsx
+// ✅ Recommended: explicit shared store
+import { createStreamStore, StreamProvider } from 'use-resumable-stream';
+
+const store = createStreamStore();
+
+export default function RootLayout({ children }) {
+  return (
+    <StreamProvider store={store}>
+      {children}
+    </StreamProvider>
+  );
+}
+
+// In your hook/component:
+const runner = createTaskRunner(store, { resumeTransport, initialData, onEvent });
+```
+
+> **⚠️ Anti-pattern: dual store split**
+>
+> If you pass no `store` to `<StreamProvider>`, it creates its own internal store (`storeB`).
+> If you also call `createTaskRunner(myStore, ...)` with a separately created `myStore` (`storeA`),
+> `AutoResumeList` reads from `storeB` while your runner writes to `storeA` — they never see each other.
+>
+> ```tsx
+> // ❌ Wrong: two independent stores
+> const myStore = createStreamStore();          // storeA
+> const runner = createTaskRunner(myStore, ...);
+>
+> <StreamProvider>                              // creates storeB internally
+>   <AutoResumeList ... />                      // reads storeB → never sees runner's writes
+> </StreamProvider>
+> ```
+
 ```tsx
 <StreamProvider store={optionalCustomStore}>
   {children}
@@ -236,7 +272,7 @@ Core hook for managing a resumable stream.
 | Property | Type | Description |
 |---|---|---|
 | `state` | `StreamState<TData>` | Current stream state |
-| `start` | `(body) => { pendingKey, realId }` | Start a new task |
+| `start` | `(body, options?) => { pendingKey, realId }` | Start a new task. Pass `options.pendingKey` to use a pre-generated key |
 | `resume` | `(taskKey, fromSeq?) => void` | Manually resume a task |
 | `cancel` | `() => void` | Cancel current connection |
 | `getTaskState` | `(taskKey) => StreamState \| undefined` | Read any task's state |
@@ -266,8 +302,20 @@ Automatically resumes all in-progress tasks from a list.
   initialData={() => initialState}
   onEvent={reducer}
   onCompleted={handleCompleted}
+  store={myStore}  // optional: inject explicit store to avoid dual-store split
 />
 ```
+
+| Prop | Type | Description |
+|---|---|---|
+| `taskKeys` | `string[]` | Task keys to resume (only real keys, not pending) |
+| `resumeTransport` | `Transport` | Transport for resuming |
+| `initialData` | `() => TData` | Initial data factory |
+| `onEvent` | `(data, event) => data` | Event reducer |
+| `store` | `StreamStore` | Optional explicit store. Pass the same store used by your `TaskRunner` to avoid dual-store split |
+| `onCompleted` | `(key, realId) => void` | Called on STOP |
+| `onFailed` | `(key, message) => void` | Called on ERROR |
+| `retryDelays` | `number[]` | Retry backoff delays |
 
 ### Stream Event Types
 
@@ -330,6 +378,7 @@ This library was extracted from a production LLM writing app. Every guard below 
 | Empty SNAPSHOT check in `onEvent` | Resume returns empty snapshot → content wiped |
 | `isPendingKey()` check before network | Pending key sent to backend → 400 error |
 | Terminal state check before resume | Completed task re-subscribed → content overwritten |
+| Double terminal guard inside `runResume` | Race: STOP arrives after resume() guard passes → status reverts from completed to connecting |
 | `useSyncExternalStore` (not SWR cache) | Write to SWR cache, read from subscription → no update |
 | Alias map (pendingKey → realKey) | `activeWorkId` switches before realId arrives → blank screen |
 

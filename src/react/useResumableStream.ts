@@ -117,9 +117,9 @@ export function useResumableStream<TData, TStartBody = unknown, TResumeBody = un
   // 公开 API
   // ─────────────────────────────────────────────
 
-  function start(body: TStartBody): { pendingKey: PendingKey; realId: Promise<string> } {
+  function start(body: TStartBody, options?: { pendingKey?: string }): { pendingKey: PendingKey; realId: Promise<string> } {
     const runner = runnerRef.current!;
-    const result = runner.start(body);
+    const result = runner.start(body, options);
     // 立即切换到 pendingKey，让 UI 立即响应
     setCurrentKey(result.pendingKey);
     // realId resolve 后自动切换到真实 key

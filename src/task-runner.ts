@@ -80,13 +80,15 @@ export function createTaskRunner<TData, TStartBody = unknown, TResumeBody = unkn
   /**
    * 发起新任务（start）。
    * 立即返回 pendingKey，Promise resolve 时返回真实 ID。
+   * @param body 请求体
+   * @param options.pendingKey 可选，外部预先生成的 pendingKey
    */
-  function start(body: TStartBody): { pendingKey: TaskKey; realId: Promise<string> } {
+  function start(body: TStartBody, options?: { pendingKey?: string }): { pendingKey: TaskKey; realId: Promise<string> } {
     if (!startTransport) {
       throw new Error('[use-resumable-stream] startTransport 未配置，无法发起新任务');
     }
 
-    const pendingKey = createPendingKey();
+    const pendingKey = (options?.pendingKey as TaskKey | undefined) ?? createPendingKey();
     let resolveRealId!: (id: string) => void;
     const realIdPromise = new Promise<string>((resolve) => {
       resolveRealId = resolve;
@@ -270,7 +272,15 @@ export function createTaskRunner<TData, TStartBody = unknown, TResumeBody = unkn
     transport: Transport<unknown>,
   ) {
     const current = readOrCreate(taskKey);
-    if (current.status !== 'streaming') {
+
+    // 二次终态守卫：防止 resume() 入口通过后、连接建立前的竞态窗口
+    if (current.status === 'completed' || current.status === 'failed') {
+      activeContexts.delete(taskKey);
+      return;
+    }
+
+    // 只在 idle/connecting 时写入 connecting，不覆盖 streaming
+    if (current.status === 'idle') {
       writeState(taskKey, { status: 'connecting' });
     }
 

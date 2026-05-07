@@ -196,8 +196,10 @@ export interface ResumableStreamResult<TData, TStartBody = unknown> {
    * 发起新任务。
    * 立即返回 pendingKey（可用于订阅进度），
    * Promise resolve 时返回服务端分配的真实 ID。
+   * @param body 请求体
+   * @param options.pendingKey 可选，外部预先生成的 pendingKey（避免手动 migrateKey）
    */
-  start: (body: TStartBody) => { pendingKey: PendingKey; realId: Promise<string> };
+  start: (body: TStartBody, options?: { pendingKey?: string }) => { pendingKey: PendingKey; realId: Promise<string> };
 
   /**
    * 手动续订已有任务（通常由 AutoResumeList 调用）。
